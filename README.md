@@ -29,6 +29,28 @@ Or try without installing:
 npx @os-eco/overstory-cli --help
 ```
 
+### WSL2 / Linux Setup
+
+If Bun is not yet installed, the official install script requires `unzip`:
+
+```bash
+sudo apt-get install -y unzip
+curl -fsSL https://bun.sh/install | bash
+```
+
+Alternatively, install Bun via npm (no `unzip` required):
+
+```bash
+npm install -g bun
+```
+
+After installation, ensure `~/.bun/bin` is on your PATH:
+
+```bash
+echo 'export PATH="$HOME/.bun/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ### Development
 
 ```bash
@@ -70,6 +92,29 @@ ov nudge <agent-name>
 # Check mail from agents
 ov mail check --inject
 ```
+
+### Setting Up a Target Project
+
+To use overstory in a project, initialize it and install hooks:
+
+```bash
+cd your-project
+ov init                       # Creates .overstory/ directory structure
+ov hooks install              # Wires hooks into .claude/settings.local.json
+ov doctor                     # Verify setup health (databases auto-create on first use)
+```
+
+If using the seeds task tracker:
+
+```bash
+sd init                       # Initialize .seeds/ for task tracking
+sd create --title "my task"   # Create a task
+ov sling <task-id> --capability scout --name my-scout  # Spawn an agent
+```
+
+### Spawning Agents from Within Claude Code
+
+When running `ov sling` from inside an active Claude Code session (e.g., via the Bash tool), overstory automatically strips Claude Code's environment variables (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`) from spawned tmux sessions. Without this, Claude Code refuses to launch with a "nested session" error. Overstory also auto-accepts the bypass permissions confirmation dialog when agents are spawned in `bypassPermissions` mode.
 
 ## Commands
 
