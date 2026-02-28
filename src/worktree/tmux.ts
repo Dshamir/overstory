@@ -91,6 +91,10 @@ export async function createSession(
 	// Build environment exports for the tmux session
 	const exports: string[] = [];
 
+	// Unset Claude Code env vars to prevent "nested session" detection when
+	// spawning Claude Code agents from within an existing Claude Code session.
+	exports.push("unset CLAUDECODE CLAUDE_CODE_ENTRYPOINT CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS");
+
 	// Ensure PATH includes the overstory binary directory
 	// so that hooks calling `overstory` inside the session can find it
 	const overstoryBinDir = await detectOverstoryBinDir();
@@ -107,10 +111,19 @@ export async function createSession(
 
 	const wrappedCommand = exports.length > 0 ? `${exports.join(" && ")} && ${command}` : command;
 
-	const { exitCode, stderr } = await runCommand(
+	// Strip Claude Code env vars from the process environment passed to tmux,
+	// so they are never inherited by the spawned session's child processes.
+	const cleanEnv = { ...process.env };
+	delete cleanEnv.CLAUDECODE;
+	delete cleanEnv.CLAUDE_CODE_ENTRYPOINT;
+	delete cleanEnv.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS;
+
+	const createProc = Bun.spawn(
 		["tmux", "new-session", "-d", "-s", name, "-c", cwd, wrappedCommand],
-		cwd,
+		{ cwd, stdout: "pipe", stderr: "pipe", env: cleanEnv },
 	);
+	const exitCode = await createProc.exited;
+	const stderr = await new Response(createProc.stderr).text();
 
 	if (exitCode !== 0) {
 		throw new AgentError(`Failed to create tmux session "${name}": ${stderr.trim()}`, {
@@ -462,7 +475,13 @@ export async function waitForTuiReady(
 			const state = detectReady(content);
 
 			if (state.phase === "dialog" && !dialogHandled) {
-				await sendKeys(name, "");
+				// Send the dialog-specific action keys (e.g. "Enter" or "Down Enter").
+				// Each word is a separate tmux key name sent sequentially.
+				const actionKeys = state.action.split(" ").filter((k) => k.length > 0);
+				for (const key of actionKeys) {
+					await runCommand(["tmux", "send-keys", "-t", name, key]);
+					await Bun.sleep(200);
+				}
 				dialogHandled = true;
 				await Bun.sleep(pollIntervalMs);
 				continue;

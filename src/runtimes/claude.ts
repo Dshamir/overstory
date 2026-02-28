@@ -149,6 +149,13 @@ export class ClaudeRuntime implements AgentRuntime {
 			return { phase: "dialog", action: "Enter" };
 		}
 
+		// Bypass Permissions confirmation dialog — select "Yes, I accept" (option 2)
+		// by sending Down+Enter. The dialog contains "bypass permissions" and "❯"
+		// which would otherwise match the ready heuristics below.
+		if (paneContent.includes("Yes, I accept") && paneContent.includes("No, exit")) {
+			return { phase: "dialog", action: "Down Enter" };
+		}
+
 		// Phase 1: prompt indicator confirms Claude Code has started.
 		// ❯ is the claude prompt character; 'Try "' appears in the welcome banner.
 		const hasPrompt = paneContent.includes("\u276f") || paneContent.includes('Try "');
